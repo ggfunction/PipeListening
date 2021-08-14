@@ -36,6 +36,9 @@ namespace PipeListening
             {
                 Console.Write(e.Reader.ReadToEnd());
             };
+
+            /* this.server.IgnorePriority = this.server.Priority == Priority.None; */
+
             this.server.Start();
         }
 

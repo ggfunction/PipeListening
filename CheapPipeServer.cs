@@ -32,6 +32,8 @@ namespace PipeListening
 
             bool createNew;
             this.mutex = new Mutex(true, name, out createNew);
+            this.Priority = createNew ?
+                Priority.High : Priority.None;
 
             this.waitToListen = new EventWaitHandle(true, EventResetMode.ManualReset);
             this.waitToQuit = new EventWaitHandle(false, EventResetMode.AutoReset);
@@ -42,6 +44,8 @@ namespace PipeListening
         }
 
         public event EventHandler<RecievedEventArgs> Recieved;
+
+        public event EventHandler PriorityChanged;
 
         public int ConcurrentRequests
         {
@@ -55,6 +59,10 @@ namespace PipeListening
                 this.concurrentRequests = Math.Min(Math.Max(1, value), Environment.ProcessorCount);
             }
         }
+
+        public Priority Priority { get; private set; }
+
+        public bool IgnorePriority { get; set; }
 
         public bool IsListening
         {
@@ -105,6 +113,14 @@ namespace PipeListening
             }
         }
 
+        protected virtual void OnPriorityChanged(EventArgs e)
+        {
+            if (this.PriorityChanged != null)
+            {
+                this.PriorityChanged(this, e);
+            }
+        }
+
         private WaitHandle BeginWaitForConnection()
         {
             var serverStream = default(NamedPipeServerStream);
@@ -112,6 +128,11 @@ namespace PipeListening
 
             try
             {
+                if (!this.IgnorePriority && this.Priority == Priority.None)
+                {
+                    throw new InvalidOperationException(Priority.None.ToString());
+                }
+
                 serverStream = new NamedPipeServerStream(this.Name, PipeDirection.InOut, -1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
                 ar = serverStream.BeginWaitForConnection(this.ConnectCallback, serverStream);
                 return ar.AsyncWaitHandle;
@@ -129,7 +150,46 @@ namespace PipeListening
                 }
             }
 
-            return new EventWaitHandle(true, EventResetMode.AutoReset);
+            return null;
+        }
+
+        private WaitHandle DelayOrWaitOne(int milliseconds)
+        {
+            var eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
+            var timer = default(Timer);
+            timer = new Timer(
+                o =>
+            {
+                timer.Change(Timeout.Infinite, Timeout.Infinite);
+
+                if (this.Priority == Priority.None)
+                {
+                    try
+                    {
+                        if (this.mutex.WaitOne(0))
+                        {
+                            this.Priority = Priority.High;
+                        }
+                    }
+                    catch (AbandonedMutexException)
+                    {
+                        this.Priority = Priority.High;
+                    }
+
+                    if (this.Priority != Priority.None)
+                    {
+                        this.OnPriorityChanged(EventArgs.Empty);
+                    }
+                }
+
+                eventWaitHandle.Set();
+                timer.Dispose();
+            },
+                null,
+                milliseconds,
+                0);
+
+            return eventWaitHandle;
         }
 
         private void ConnectCallback(IAsyncResult ar)
@@ -171,17 +231,35 @@ namespace PipeListening
                 this.waitToListen,
             };
 
-            var connections = new HashSet<WaitHandle>();
+            var requests = new HashSet<WaitHandle>();
 
             for (var i = 0; i < this.ConcurrentRequests; i++)
             {
-                connections.Add(this.BeginWaitForConnection());
+                requests.Add(this.BeginWaitForConnection());
             }
 
             while (true)
             {
-                var waitHandlesArray = waitHandles.Concat(connections).ToArray();
-                var index = WaitHandle.WaitAny(waitHandlesArray);
+                var waitHandlesArray = waitHandles.Concat(requests).ToArray();
+                var index = 0;
+                const int ErrorHandled = -1;
+
+                try
+                {
+                    index = WaitHandle.WaitAny(waitHandlesArray);
+                }
+                catch (ObjectDisposedException)
+                {
+                    requests.RemoveWhere(x => x.SafeWaitHandle.IsClosed);
+                    requests.Add(this.BeginWaitForConnection());
+                    index = ErrorHandled;
+                }
+                catch (ArgumentNullException)
+                {
+                    requests.RemoveWhere(x => x == null);
+                    requests.Add(this.DelayOrWaitOne(1000));
+                    index = ErrorHandled;
+                }
 
                 if (index == Array.IndexOf(waitHandlesArray, this.waitToQuit))
                 {
@@ -193,11 +271,16 @@ namespace PipeListening
                     continue;
                 }
 
-                connections.Remove(waitHandlesArray[index]);
-
-                for (var i = connections.Count; i < this.ConcurrentRequests; i++)
+                if (index == ErrorHandled)
                 {
-                    connections.Add(this.BeginWaitForConnection());
+                    continue;
+                }
+
+                requests.Remove(waitHandlesArray[index]);
+
+                for (var i = requests.Count; i < this.ConcurrentRequests; i++)
+                {
+                    requests.Add(this.BeginWaitForConnection());
                 }
             }
         }
