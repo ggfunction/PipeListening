@@ -1,0 +1,24 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[*.{cs}]
+dotnet_diagnostic.SA0001.severity = none
+dotnet_diagnostic.SA1101.severity = warning
+dotnet_diagnostic.SA1200.severity = warning
+dotnet_diagnostic.SA1313.severity = none
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1601.severity = none
+dotnet_diagnostic.SA1633.severity = none
+
+[*.{*proj,}]
+indent_size = 2
