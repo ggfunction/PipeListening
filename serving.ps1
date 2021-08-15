@@ -15,7 +15,16 @@ $addTypeParams = @{
 Add-Type @addTypeParams
 
 try {
-    $server = New-Object PipeListening.CheapPipeServer
+    $server = New-Object PipeListening.CheapPipeServer("Test1")
+
+    $recievedEvent = Register-ObjectEvent -InputObject $server -EventName Recieved -Action {
+        $Event | Out-Host
+    }
+
+    $priorityChangedEvent = Register-ObjectEvent -InputObject $server -EventName PriorityChanged -Action {
+        $Event | Out-Host
+    }
+
     $text = @'
 {0} {1}
 '@ -f $server.GetType(), $server.Name
@@ -26,4 +35,7 @@ try {
         $server.Close()
         $server = $null
     }
+
+    Unregister-Event -SourceIdentifier $recievedEvent.Name
+    Unregister-Event -SourceIdentifier $priorityChangedEvent.Name
 }
