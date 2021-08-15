@@ -75,12 +75,6 @@ namespace PipeListening
         {
             this.Stop();
             this.waitToQuit.Set();
-        }
-
-        public void Dispose()
-        {
-            this.Close();
-
             if (this.mutex != null)
             {
                 try
@@ -93,6 +87,11 @@ namespace PipeListening
 
                 this.mutex.Close();
             }
+        }
+
+        public void Dispose()
+        {
+            this.Close();
         }
 
         public void Start()
@@ -156,12 +155,10 @@ namespace PipeListening
         private WaitHandle DelayOrWaitOne(int milliseconds)
         {
             var eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
-            var timer = default(Timer);
-            timer = new Timer(
+
+            ThreadPool.QueueUserWorkItem(
                 o =>
             {
-                timer.Change(Timeout.Infinite, Timeout.Infinite);
-
                 if (this.Priority == Priority.None)
                 {
                     try
@@ -182,12 +179,9 @@ namespace PipeListening
                     }
                 }
 
+                Thread.Sleep(milliseconds);
                 eventWaitHandle.Set();
-                timer.Dispose();
-            },
-                null,
-                milliseconds,
-                0);
+            });
 
             return eventWaitHandle;
         }
