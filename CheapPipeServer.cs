@@ -8,7 +8,7 @@ namespace PipeListening
 
     public class CheapPipeServer : IDisposable
     {
-        private readonly Mutex mutex;
+        private readonly Semaphore semaphore;
 
         private readonly EventWaitHandle waitToListen;
 
@@ -30,9 +30,8 @@ namespace PipeListening
 
             this.Name = name;
 
-            bool createNew;
-            this.mutex = new Mutex(true, name, out createNew);
-            this.Priority = createNew ?
+            this.semaphore = new Semaphore(1, 1, this.Name);
+            this.Priority = this.semaphore.WaitOne(0) ?
                 Priority.High : Priority.None;
 
             this.waitToListen = new EventWaitHandle(true, EventResetMode.ManualReset);
@@ -75,18 +74,13 @@ namespace PipeListening
         {
             this.Stop();
             this.waitToQuit.Set();
-            if (this.mutex != null)
-            {
-                try
-                {
-                    this.mutex.ReleaseMutex();
-                }
-                catch
-                {
-                }
 
-                this.mutex.Close();
+            if (this.Priority == Priority.High)
+            {
+                this.semaphore.Release();
             }
+
+            this.semaphore.Close();
         }
 
         public void Dispose()
@@ -161,20 +155,9 @@ namespace PipeListening
             {
                 if (this.Priority == Priority.None)
                 {
-                    try
-                    {
-                        if (this.mutex.WaitOne(0))
-                        {
-                            this.Priority = Priority.High;
-                        }
-                    }
-                    catch (AbandonedMutexException)
+                    if (this.semaphore.WaitOne(0))
                     {
                         this.Priority = Priority.High;
-                    }
-
-                    if (this.Priority != Priority.None)
-                    {
                         this.OnPriorityChanged(EventArgs.Empty);
                     }
                 }
