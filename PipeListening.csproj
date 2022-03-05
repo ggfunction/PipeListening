@@ -14,4 +14,11 @@
     </PackageReference>
   </ItemGroup>
 
+  <PropertyGroup>
+    <Memorandum>../Memorandum</Memorandum>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(Memorandum)/Memorandum.csproj" />
+  </ItemGroup>
 </Project>
