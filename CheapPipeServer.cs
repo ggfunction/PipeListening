@@ -20,18 +20,26 @@ namespace PipeListening
 
         private int concurrentRequests;
 
+        private SynchronizationContext synchronizationContext;
+
         public CheapPipeServer()
-            : this(string.Empty)
+            : this(string.Empty, SynchronizationContext.Current)
         {
         }
 
         public CheapPipeServer(string name)
+            : this(name, SynchronizationContext.Current)
+        {
+        }
+
+        public CheapPipeServer(string name, SynchronizationContext context)
         {
             this.Name = string.IsNullOrEmpty(name) ?
                 Guid.NewGuid().ToString() : name;
 
             this.semaphore = new Semaphore(1, 1, this.Name);
             this.streams = new List<NamedPipeServerStream>();
+            this.synchronizationContext = context;
 
             this.Priority = this.semaphore.WaitOne(0) ?
                 Priority.High : Priority.None;
@@ -73,13 +81,20 @@ namespace PipeListening
         public void Close()
         {
             this.Stop();
-            this.stopEvent.Set();
             this.semaphore.Close();
         }
 
         public void Dispose()
         {
             this.Close();
+        }
+
+        public void SetSynchronizationContext(SynchronizationContext context)
+        {
+            lock (this.lockObject)
+            {
+                this.synchronizationContext = context;
+            }
         }
 
         public void Start()
@@ -105,7 +120,9 @@ namespace PipeListening
         {
             if (this.MessageReceived != null)
             {
-                this.MessageReceived(this, e);
+                this.Invoke(
+                    this.MessageReceived,
+                    e);
             }
         }
 
@@ -113,7 +130,9 @@ namespace PipeListening
         {
             if (this.PriorityChanged != null)
             {
-                this.PriorityChanged(this, e);
+                this.Invoke(
+                    this.PriorityChanged,
+                    e);
             }
         }
 
@@ -205,6 +224,49 @@ namespace PipeListening
             }
         }
 
+        private SynchronizationContext GetSynchronizationContext()
+        {
+            var context = default(SynchronizationContext);
+
+            lock (this.lockObject)
+            {
+                context = this.synchronizationContext;
+            }
+
+            return context;
+        }
+
+        private void Invoke(EventHandler handler, EventArgs e)
+        {
+            var context = this.GetSynchronizationContext();
+
+            if (context != null)
+            {
+                this.synchronizationContext.Send(
+                    state => handler.Invoke(this, (EventArgs)state), e);
+            }
+            else
+            {
+                handler.Invoke(this, e);
+            }
+        }
+
+        private void Invoke<T>(EventHandler<T> handler, T e)
+            where T : EventArgs
+        {
+            var context = this.GetSynchronizationContext();
+
+            if (context != null)
+            {
+                this.synchronizationContext.Send(
+                    state => handler.Invoke(this, (T)state), e);
+            }
+            else
+            {
+                handler.Invoke(this, e);
+            }
+        }
+
         private void WaitCallback(object state)
         {
             var requests = new HashSet<WaitHandle>
@@ -224,7 +286,9 @@ namespace PipeListening
                     }
                 }
 
-                var waitHandles = requests.Prepend(this.stopEvent).ToArray();
+                var waitHandles = new WaitHandle[] { this.stopEvent }
+                    .Concat(requests)
+                    .ToArray();
                 var index = WaitHandle.WaitTimeout;
                 bool exit;
 
@@ -248,7 +312,7 @@ namespace PipeListening
                 {
                     var waitHandle = waitHandles[index];
                     requests.Remove(waitHandle);
-                    waitHandle.Dispose();
+                    waitHandle.Close();
                 }
                 catch (Exception ex)
                 {
