@@ -22,8 +22,24 @@ namespace PipeListening
                 Width = 100,
             };
 
+            this.Button2 = new Button
+            {
+                Text = "Start",
+                Left = this.TextBox1.Left,
+                Top = this.Button1.Top + this.Button1.Height + 8,
+                Width = 100,
+            };
+
+            this.Button3 = new Button
+            {
+                Text = "Stop",
+                Left = this.Button2.Left + this.Button2.Width + 8,
+                Top = this.Button2.Top,
+                Width = 100,
+            };
+
             this.Text = Application.ProductName;
-            this.Controls.AddRange(new Control[] { this.TextBox1, this.Button1 });
+            this.Controls.AddRange(new Control[] { this.TextBox1, this.Button1, this.Button2, this.Button3 });
         }
     }
 }

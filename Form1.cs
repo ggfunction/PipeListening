@@ -31,6 +31,16 @@ namespace PipeListening
                 }
             };
 
+            this.Button2.Click += (s, e) =>
+            {
+                this.server.Start();
+            };
+
+            this.Button3.Click += (s, e) =>
+            {
+                this.server.Stop();
+            };
+
             this.server = new CheapPipeServer(PipeName);
             this.server.Recieved += (s, e) =>
             {
@@ -38,12 +48,14 @@ namespace PipeListening
             };
 
             /* this.server.IgnorePriority = this.server.Priority == Priority.None; */
-
-            this.server.Start();
         }
 
         public TextBox TextBox1 { get; private set; }
 
         public Button Button1 { get; private set; }
+
+        public Button Button2 { get; private set; }
+
+        public Button Button3 { get; private set; }
     }
 }
