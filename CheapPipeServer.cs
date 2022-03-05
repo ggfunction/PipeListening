@@ -167,7 +167,7 @@ namespace PipeListening
                 Console.WriteLine(ex);
             }
 
-            return Memorandum.Threading.Delay.Signal(100);
+            throw new NotImplementedException();
         }
 
         private WaitHandle BeginWaitOne()
