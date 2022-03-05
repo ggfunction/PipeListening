@@ -42,7 +42,7 @@ namespace PipeListening
             this.ConcurrentRequests = Environment.ProcessorCount;
         }
 
-        public event EventHandler<RecievedEventArgs> Recieved;
+        public event EventHandler<MessageReceivedEventArgs> MessageReceived;
 
         public event EventHandler PriorityChanged;
 
@@ -101,11 +101,11 @@ namespace PipeListening
             this.stopEvent.Set();
         }
 
-        protected virtual void OnRecieved(RecievedEventArgs e)
+        protected virtual void OnMessageReceived(MessageReceivedEventArgs e)
         {
-            if (this.Recieved != null)
+            if (this.MessageReceived != null)
             {
-                this.Recieved(this, e);
+                this.MessageReceived(this, e);
             }
         }
 
@@ -177,13 +177,13 @@ namespace PipeListening
         private void ConnectCallback(IAsyncResult ar)
         {
             var ss = ar.AsyncState as NamedPipeServerStream;
-            var e = default(RecievedEventArgs);
+            var e = default(MessageReceivedEventArgs);
 
             try
             {
                 ss.EndWaitForConnection(ar);
-                e = new RecievedEventArgs(ss);
-                this.OnRecieved(e);
+                e = new MessageReceivedEventArgs(ss);
+                this.OnMessageReceived(e);
             }
             catch (System.IO.IOException ex)
             {

@@ -42,7 +42,7 @@ namespace PipeListening
             };
 
             this.server = new CheapPipeServer(PipeName);
-            this.server.Recieved += (s, e) =>
+            this.server.MessageReceived += (s, e) =>
             {
                 Console.Write(e.Reader.ReadToEnd());
             };

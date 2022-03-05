@@ -3,15 +3,15 @@ namespace PipeListening
     using System;
     using System.IO;
 
-    public class RecievedEventArgs : EventArgs, IDisposable
+    public class MessageReceivedEventArgs : EventArgs, IDisposable
     {
-        public RecievedEventArgs()
+        public MessageReceivedEventArgs()
         {
             this.Content = new MemoryStream();
             this.Reader = new StreamReader(this.Content);
         }
 
-        public RecievedEventArgs(System.IO.Pipes.PipeStream stream)
+        public MessageReceivedEventArgs(System.IO.Pipes.PipeStream stream)
             : this()
         {
             this.CopyStream(stream, this.Content);
